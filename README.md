@@ -19,7 +19,7 @@ npm run dev                  # http://localhost:3000
 | Script              | What it does                               |
 | ------------------- | ------------------------------------------ |
 | `npm run dev`       | Dev server with hot reload (Turbopack)     |
-| `npm run build`     | Production build                           |
+| `npm run build`     | Production build (webpack — see note below) |
 | `npm run start`     | Serve the production build (uses `$PORT`)  |
 | `npm run lint`      | ESLint (Next.js core-web-vitals + TS)      |
 | `npm run typecheck` | Generate route types, then `tsc --noEmit`  |
@@ -59,8 +59,9 @@ The app uses a plain `next build` / `next start` setup with no Vercel-only featu
 6. **Redeploys.** Each push to the connected branch triggers a new build. If that isn't happening, click **Redeploy**.
 
 Notes:
+- **Why `next build --webpack` and `next.config.mjs`:** Hostinger's build servers run an older glibc (< 2.29), so Next.js can't load its native compiler and falls back to WebAssembly. That fallback can't run Turbopack or compile a TypeScript `next.config.ts`, so production builds use webpack and the config is plain JavaScript. Local `npm run dev` still uses Turbopack.
 - `next/font/google` downloads Poppins at **build time**. Hostinger's build servers have internet access, so no action is needed.
-- Image optimisation runs on the Node server (`sharp` is installed automatically with Next.js). Remote images are allowed from `images.unsplash.com` in `next.config.ts`. Add your own CDN host there when you replace the placeholders.
+- Image optimisation runs on the Node server (`sharp` is installed automatically with Next.js). Remote images are allowed from `images.unsplash.com` in `next.config.mjs`. Add your own CDN host there when you replace the placeholders.
 
 ---
 

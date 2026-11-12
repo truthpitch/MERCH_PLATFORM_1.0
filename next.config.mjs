@@ -1,6 +1,9 @@
-import type { NextConfig } from "next";
+// Plain JavaScript (not next.config.ts) on purpose: Hostinger's build servers
+// run an older glibc, so Next.js falls back to its WebAssembly compiler, which
+// cannot transpile a TypeScript config file.
 
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   reactStrictMode: true,
   poweredByHeader: false,
   images: {
