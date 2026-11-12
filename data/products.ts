@@ -1,12 +1,15 @@
 /**
- * Mock product catalog — Phase 1 only.
- *
- * DO NOT import this file from pages or components. Go through
- * `lib/products.ts` so the source can switch to a database in Phase 2.
+ * Phase 1 catalog — now ONLY used as seed data (prisma/seed.ts migrates it
+ * into the database as admin-owned, APPROVED designs). The app reads
+ * products from the database via lib/products.ts.
  */
-import type { Designer, Product, ProductColor, ProductImage, ProductSize } from "@/types";
+import type { Product, ProductColor, ProductImage, ProductSize } from "@/types";
 
-export const TRUTHPITCH_DESIGNER: Designer = { id: "truthpitch", name: "TruthPitch" };
+export type Phase1Product = Pick<
+  Product,
+  | "id" | "slug" | "name" | "tagline" | "price" | "compareAtPrice" | "category" | "colors" | "sizes"
+  | "description" | "story" | "details" | "images" | "isNew" | "isBestSeller" | "tags" | "createdAt"
+>;
 
 const img = (id: string, alt: string): ProductImage => ({
   src: `https://images.unsplash.com/photo-${id}?auto=format&fit=crop&w=1200&h=1500&q=80`,
@@ -31,9 +34,7 @@ const C = {
 const APPAREL: ProductSize[] = ["XS", "S", "M", "L", "XL", "XXL"];
 const ONE: ProductSize[] = ["One Size"];
 
-type Seed = Omit<Product, "currency" | "designer" | "status"> & Partial<Pick<Product, "designer" | "status">>;
-
-const seeds: Seed[] = [
+export const products: Phase1Product[] = [
   {
     id: "tp-001",
     slug: "say-it-straight-tee",
@@ -316,10 +317,3 @@ const seeds: Seed[] = [
     createdAt: "2026-05-15",
   },
 ];
-
-export const products: Product[] = seeds.map((s) => ({
-  ...s,
-  currency: "USD",
-  designer: s.designer ?? TRUTHPITCH_DESIGNER,
-  status: s.status ?? "approved",
-}));

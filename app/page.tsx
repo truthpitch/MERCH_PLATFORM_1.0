@@ -13,6 +13,9 @@ import { getBestSellers, getLatestDrop } from "@/lib/products";
 import { organizationJsonLd, websiteJsonLd } from "@/lib/seo";
 import { siteConfig } from "@/lib/site";
 
+// Reads live catalog data from the database.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: { absolute: "TruthPitch — Say it straight. Merch that means it." },
   alternates: { canonical: "/" },

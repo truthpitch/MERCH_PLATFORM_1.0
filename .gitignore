@@ -23,3 +23,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Phase 2: database, generated client, local uploads
+/generated/
+/prisma/*.db
+/prisma/*.db-journal
+/storage/

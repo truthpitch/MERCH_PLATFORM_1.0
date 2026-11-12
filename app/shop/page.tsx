@@ -5,6 +5,9 @@ import { PageHeader } from "@/components/shop/PageHeader";
 import { ShopView } from "@/components/shop/ShopView";
 import { getFilterOptions, getProducts } from "@/lib/products";
 
+// Reads live catalog data from the database.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Shop",
   description: "Heavyweight tees, hoodies, hats and goods from TruthPitch. Every design says one thing, clearly.",

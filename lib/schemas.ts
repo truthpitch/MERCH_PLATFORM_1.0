@@ -92,3 +92,73 @@ export type ContactStepInput = z.infer<typeof contactStepSchema>;
 export type ShippingStepInput = z.infer<typeof shippingStepSchema>;
 export type ContactFormInput = z.infer<typeof contactFormSchema>;
 export type NewsletterInput = z.infer<typeof newsletterSchema>;
+
+/* ------------------------------------------------------------------
+   Phase 2 — accounts, designs, admin
+   ------------------------------------------------------------------ */
+
+export const passwordSchema = z
+  .string()
+  .min(8, "Use at least 8 characters")
+  .max(200, "That's a bit long")
+  .regex(/[A-Za-z]/, "Include at least one letter")
+  .regex(/\d/, "Include at least one number");
+
+export const usernameSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(3, "At least 3 characters")
+  .max(30, "30 characters max")
+  .regex(/^[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?$/, "Letters, numbers, - and _ only");
+
+export const signInSchema = z.object({
+  email: z.email("Enter a valid email"),
+  password: z.string().min(1, "Enter your password"),
+});
+
+export const signUpSchema = z.object({
+  name: z.string().trim().min(2, "Tell us your name").max(80),
+  username: usernameSchema,
+  email: z.email("Enter a valid email"),
+  password: passwordSchema,
+});
+
+export const forgotPasswordSchema = z.object({ email: z.email("Enter a valid email") });
+
+export const resetPasswordSchema = z
+  .object({ token: z.string().min(20), password: passwordSchema, confirm: z.string() })
+  .refine((v) => v.password === v.confirm, { message: "Passwords don't match", path: ["confirm"] });
+
+export const profileSchema = z.object({
+  name: z.string().trim().min(2, "Tell us your name").max(80),
+  username: usernameSchema,
+  bio: z.string().trim().max(280, "Keep it under 280 characters"),
+  image: z.string().max(500).optional().nullable(),
+});
+
+export const changePasswordSchema = z
+  .object({ current: z.string().optional(), password: passwordSchema, confirm: z.string() })
+  .refine((v) => v.password === v.confirm, { message: "Passwords don't match", path: ["confirm"] });
+
+export const designSchema = z.object({
+  id: z.string().optional(),
+  title: z.string().trim().min(3, "Give it a title").max(60, "60 characters max"),
+  tagline: z.string().trim().max(80, "80 characters max"),
+  description: z.string().trim().min(20, "Describe it in at least 20 characters").max(600),
+  story: z.string().trim().min(30, "Tell us the truth behind it (30+ characters)").max(1200),
+  imageKey: z.string().min(1, "Upload your artwork"),
+  productTypes: z.array(z.enum(["TEE", "HOODIE", "HAT"])).min(1, "Pick at least one product"),
+  placementX: z.number().min(-50).max(50),
+  placementY: z.number().min(-50).max(50),
+  placementScale: z.number().min(0.3).max(1.6),
+  intent: z.enum(["draft", "submit"]),
+});
+
+export const rejectSchema = z.object({
+  designId: z.string().min(1),
+  reason: z.string().trim().min(10, "Give the creator a real reason (10+ characters)").max(600),
+});
+
+export type SignUpInput = z.infer<typeof signUpSchema>;
+export type DesignInput = z.infer<typeof designSchema>;

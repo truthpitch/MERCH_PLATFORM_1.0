@@ -3,6 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { AddressFields } from "@/components/checkout/AddressFields";
@@ -17,13 +18,14 @@ import { contactStepSchema, shippingStepSchema, type ContactStepInput, type Ship
 import { cn, formatPrice } from "@/lib/utils";
 import { selectSubtotal, useCart } from "@/store/cart";
 import { useUi } from "@/store/ui";
-import type { Address, Order, OrderDraft, ShippingMethodId } from "@/types";
+import type { Address, OrderDraft, ShippingMethodId } from "@/types";
 
 const STEPS = ["Contact", "Shipping", "Payment", "Confirmation"] as const;
 
 const emptyAddress = { firstName: "", lastName: "", line1: "", line2: "", city: "", region: "", postalCode: "", country: "US" };
 
-export function CheckoutFlow() {
+export function CheckoutFlow({ defaultEmail }: { defaultEmail?: string }) {
+  const router = useRouter();
   const hydrated = useUi((s) => s.cartHydrated);
   const items = useCart((s) => s.items);
   const subtotal = useCart(selectSubtotal);
@@ -33,7 +35,7 @@ export function CheckoutFlow() {
   const [dir, setDir] = useState(1);
   const [contact, setContact] = useState<ContactStepInput | null>(null);
   const [shipping, setShipping] = useState<ShippingStepInput | null>(null);
-  const [order, setOrder] = useState<Order | null>(null);
+  const [placed, setPlaced] = useState(false);
   const [placing, setPlacing] = useState(false);
   const [placeError, setPlaceError] = useState<string | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -53,7 +55,7 @@ export function CheckoutFlow() {
   };
 
   const method: ShippingMethodId = shipping?.shippingMethod ?? "standard";
-  const totals = order?.totals ?? computeTotals(subtotal, method);
+  const totals = computeTotals(subtotal, method);
 
   const placeOrder = async () => {
     if (!contact || !shipping) return;
@@ -76,11 +78,12 @@ export function CheckoutFlow() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(draft),
       });
-      const data = (await res.json()) as { ok: boolean; order?: Order; error?: string };
-      if (!res.ok || !data.order) throw new Error(data.error || "Something went wrong.");
-      setOrder(data.order);
+      const data = (await res.json()) as { ok: boolean; url?: string; error?: string };
+      if (!res.ok || !data.url) throw new Error(data.error || "Something went wrong.");
+      setPlaced(true);
       clearCart();
-      go(3);
+      router.push(data.url);
+      return;
     } catch (e) {
       setPlaceError(e instanceof Error ? e.message : "Something went wrong.");
     } finally {
@@ -92,7 +95,17 @@ export function CheckoutFlow() {
     return <div className="container-tp h-96 animate-pulse rounded-lg bg-navy/5" aria-busy="true" />;
   }
 
-  if (items.length === 0 && !order) {
+  if (placed) {
+    return (
+      <div className="container-tp pb-24" role="status">
+        <div className="rounded-lg bg-white px-6 py-20 text-center shadow-soft">
+          <p className="text-3xl font-bold tracking-tight">Order placed. Loading your confirmation…</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
     return (
       <div className="container-tp pb-24">
         <div className="rounded-lg border border-dashed border-navy/20 px-6 py-20 text-center">
@@ -110,8 +123,8 @@ export function CheckoutFlow() {
     <div className="container-tp pb-24 sm:pb-32">
       <Stepper step={step} />
 
-      <div className={cn("mt-10 grid gap-12", step < 3 && "lg:grid-cols-12")}>
-        <div className={cn(step < 3 ? "lg:col-span-7" : "mx-auto w-full max-w-3xl")}>
+      <div className="mt-10 grid gap-12 lg:grid-cols-12">
+        <div className="lg:col-span-7">
           <AnimatePresence mode="wait" custom={dir} initial={false} onExitComplete={onStepEntered}>
             <motion.div
               key={step}
@@ -124,7 +137,7 @@ export function CheckoutFlow() {
               {step === 0 && (
                 <ContactStep
                   headingRef={headingRef}
-                  defaultValues={contact}
+                  defaultValues={contact ?? (defaultEmail ? { email: defaultEmail, phone: "", marketingOptIn: false } : null)}
                   onSubmit={(v) => {
                     setContact(v);
                     go(1);
@@ -156,18 +169,15 @@ export function CheckoutFlow() {
                   onPlace={placeOrder}
                 />
               )}
-              {step === 3 && order && <Confirmation headingRef={headingRef} order={order} />}
             </motion.div>
           </AnimatePresence>
         </div>
 
-        {step < 3 && (
-          <aside aria-label="Order summary" className="lg:col-span-5">
-            <div className="lg:sticky lg:top-28">
-              <OrderSummary items={items} totals={totals} shippingLabel={SHIPPING_METHODS[method].label} />
-            </div>
-          </aside>
-        )}
+        <aside aria-label="Order summary" className="lg:col-span-5">
+          <div className="lg:sticky lg:top-28">
+            <OrderSummary items={items} totals={totals} shippingLabel={SHIPPING_METHODS[method].label} />
+          </div>
+        </aside>
       </div>
     </div>
   );
@@ -456,70 +466,6 @@ function PaymentStep({
         </button>
         <Button size="lg" onClick={onPlace} disabled={placing} icon={placing ? undefined : <ArrowRightIcon size={18} />}>
           {placing ? "Placing order…" : `Place order · ${formatPrice(total)}`}
-        </Button>
-      </div>
-    </div>
-  );
-}
-
-function Confirmation({ headingRef, order }: { headingRef: HeadingRef; order: Order }) {
-  return (
-    <div className="text-center">
-      <motion.span
-        initial={{ scale: 0, rotate: -45 }}
-        animate={{ scale: 1, rotate: 0 }}
-        transition={{ type: "spring", stiffness: 260, damping: 16, delay: 0.1 }}
-        className="mx-auto inline-flex h-20 w-20 items-center justify-center rounded-full bg-accent text-white"
-      >
-        <CheckIcon size={36} />
-      </motion.span>
-      <p className="eyebrow mt-8 text-brown">Order {order.number}</p>
-      <h2 ref={headingRef} tabIndex={-1} className="mt-3 text-[clamp(2.5rem,7vw,5rem)] font-bold leading-[0.9] tracking-[-0.05em] outline-none">
-        Done. No fine print.
-      </h2>
-      <p className="mx-auto mt-5 max-w-md text-lg text-muted">
-        Confirmation is on its way to <strong className="text-navy">{order.contact.email}</strong>. We print to order, so expect tracking in 2–4 days.
-      </p>
-
-      <div className="mt-12 grid gap-4 text-left sm:grid-cols-2">
-        <div className="rounded-lg bg-white p-6 shadow-soft">
-          <p className="eyebrow text-muted">{order.isGift ? "Shipping to (gift)" : "Shipping to"}</p>
-          <p className="mt-3 whitespace-pre-line font-medium">{formatAddress(order.shippingAddress)}</p>
-          <p className="mt-3 text-sm text-muted">{order.shippingMethod.label} delivery</p>
-        </div>
-        <div className="rounded-lg bg-white p-6 shadow-soft">
-          <p className="eyebrow text-muted">Summary</p>
-          <ul className="mt-3 space-y-1 text-sm">
-            {order.items.map((i) => (
-              <li key={i.variantId} className="flex justify-between gap-3">
-                <span>
-                  {i.quantity}× {i.name} <span className="text-muted">({i.color.name}, {i.size})</span>
-                </span>
-                <span className="tabular-nums">{formatPrice(i.unitPrice * i.quantity)}</span>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-4 flex justify-between border-t border-navy/10 pt-3 font-bold">
-            <span>Total paid</span>
-            <span className="tabular-nums">{formatPrice(order.totals.total)}</span>
-          </p>
-        </div>
-        {order.isGift && order.gift?.message && (
-          <div className="rounded-lg bg-sand-200 p-6 sm:col-span-2">
-            <p className="eyebrow flex items-center gap-2 text-brown">
-              <GiftIcon size={16} /> Your gift note
-            </p>
-            <p className="mt-3 text-xl font-semibold tracking-tight">“{order.gift.message}”</p>
-          </div>
-        )}
-      </div>
-
-      <div className="mt-12 flex flex-wrap justify-center gap-3">
-        <Button href="/shop" size="lg" magnetic icon={<ArrowRightIcon size={18} />}>
-          Keep shopping
-        </Button>
-        <Button href="/" size="lg" variant="outline">
-          Back home
         </Button>
       </div>
     </div>

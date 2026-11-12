@@ -58,7 +58,9 @@ export const useCart = create<CartState>()(
     }),
     {
       name: "truthpitch-cart",
-      version: 1,
+      // v2: variant ids are database ids (Phase 2) — drop Phase 1 carts.
+      version: 2,
+      migrate: () => ({ items: [] }),
       // window.* so the server never touches Node's experimental localStorage global.
       storage: createJSONStorage(() => (typeof window === "undefined" ? (undefined as never) : window.localStorage)),
       // Only persist the lines — UI state resets per visit.

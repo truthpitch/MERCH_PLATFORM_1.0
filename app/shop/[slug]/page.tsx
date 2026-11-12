@@ -1,9 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { Avatar } from "@/components/layout/AccountMenu";
+import { CommunityGallery } from "@/components/product/CommunityGallery";
 import { ProductCard } from "@/components/product/ProductCard";
 import { ProductGallery } from "@/components/product/ProductGallery";
 import { ProductPurchase } from "@/components/product/ProductPurchase";
+import { ProductSelectionProvider } from "@/components/product/ProductSelection";
 import { JsonLd } from "@/components/seo/JsonLd";
 import { Accordion } from "@/components/ui/Accordion";
 import { AnimatedText } from "@/components/ui/AnimatedText";
@@ -11,15 +14,13 @@ import { LockIcon, TruckIcon } from "@/components/ui/Icons";
 import { Reveal } from "@/components/ui/Reveal";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { CATEGORY_LABELS } from "@/lib/filters";
-import { getAllProductSlugs, getProductBySlug, getRelatedProducts } from "@/lib/products";
+import { getProductBySlug, getRelatedProducts } from "@/lib/products";
 import { breadcrumbJsonLd, productJsonLd } from "@/lib/seo";
 import { FREE_SHIPPING_THRESHOLD } from "@/lib/site";
 import { formatPrice } from "@/lib/utils";
 
-export async function generateStaticParams() {
-  const slugs = await getAllProductSlugs();
-  return slugs.map((slug) => ({ slug }));
-}
+// Reads live catalog data (approvals show up immediately).
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: PageProps<"/shop/[slug]">): Promise<Metadata> {
   const { slug } = await params;
@@ -34,9 +35,9 @@ export async function generateMetadata({ params }: PageProps<"/shop/[slug]">): P
       title: `${product.name} — TruthPitch`,
       description: product.tagline,
       url: `/shop/${product.slug}`,
-      images: [{ url: image.src, width: image.width, height: image.height, alt: image.alt }],
+      images: image.src.startsWith("http") ? [{ url: image.src, width: image.width, height: image.height, alt: image.alt }] : undefined,
     },
-    twitter: { card: "summary_large_image", images: [image.src] },
+    twitter: { card: "summary_large_image", images: image.src.startsWith("http") ? [image.src] : undefined },
   };
 }
 
@@ -69,9 +70,15 @@ export default async function ProductPage({ params }: PageProps<"/shop/[slug]">)
             </li>
             <li aria-hidden>/</li>
             <li>
-              <Link href={`/shop?category=${product.category}`} className="hover:text-navy">
-                {CATEGORY_LABELS[product.category]}
-              </Link>
+              {product.isCommunity ? (
+                <Link href="/marketplace" className="hover:text-navy">
+                  Marketplace
+                </Link>
+              ) : (
+                <Link href={`/shop?category=${product.category}`} className="hover:text-navy">
+                  {CATEGORY_LABELS[product.category]}
+                </Link>
+              )}
             </li>
             <li aria-hidden>/</li>
             <li aria-current="page" className="font-medium text-navy">
@@ -81,17 +88,41 @@ export default async function ProductPage({ params }: PageProps<"/shop/[slug]">)
         </nav>
       </div>
 
+      <ProductSelectionProvider product={product}>
       <section className="container-tp grid gap-10 pb-20 pt-6 lg:grid-cols-12 lg:gap-14 lg:pb-28">
         <div className="lg:col-span-7">
-          <ProductGallery images={product.images} name={product.name} />
+          {product.isCommunity && product.mockup ? (
+            <CommunityGallery product={product} />
+          ) : (
+            <ProductGallery images={product.images} name={product.name} />
+          )}
         </div>
 
         <div className="lg:col-span-5">
           <div className="flex flex-wrap items-center gap-2">
             {product.isNew && <span className="rounded-full bg-navy px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-white">New</span>}
             {product.isBestSeller && <span className="rounded-full bg-brown px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-white">Best seller</span>}
-            <span className="text-sm text-muted">Design by {product.designer.name}</span>
+            {product.isCommunity ? (
+              <span className="rounded-full bg-sand-200 px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-brown">Community design</span>
+            ) : (
+              <span className="text-sm text-muted">Design by {product.designer.name}</span>
+            )}
           </div>
+          {product.isCommunity && (
+            <p className="mt-5 flex items-center gap-3 text-sm">
+              <Avatar user={{ name: product.designer.name, email: product.designer.name, image: product.designer.avatar ?? null }} size={32} />
+              <span>
+                Designed by{" "}
+                {product.designer.href ? (
+                  <Link href={product.designer.href} className="font-semibold underline-offset-4 hover:text-accent hover:underline">
+                    {product.designer.name}
+                  </Link>
+                ) : (
+                  <span className="font-semibold">{product.designer.name}</span>
+                )}
+              </span>
+            </p>
+          )}
 
           <AnimatedText
             as="h1"
@@ -110,6 +141,7 @@ export default async function ProductPage({ params }: PageProps<"/shop/[slug]">)
             )}
             <span>
               {product.compareAtPrice && <span className="sr-only">Now </span>}
+              {product.productTypes.length > 1 && <span className="mr-2 text-lg font-medium text-muted">From</span>}
               {formatPrice(product.price)}
             </span>
           </p>
@@ -156,6 +188,7 @@ export default async function ProductPage({ params }: PageProps<"/shop/[slug]">)
           />
         </div>
       </section>
+      </ProductSelectionProvider>
 
       {/* The story behind the design */}
       <section aria-labelledby="story-heading" className="surface-dark bg-navy py-24 text-white sm:py-32">

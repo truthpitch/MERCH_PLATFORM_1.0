@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { AppShell } from "@/components/layout/AppShell";
 import { Footer } from "@/components/layout/Footer";
 import { Navbar } from "@/components/layout/Navbar";
+import { getCurrentUser } from "@/lib/session";
 import { siteConfig } from "@/lib/site";
 import "./globals.css";
 
@@ -50,7 +51,11 @@ export const viewport: Viewport = {
 // Runs before paint: hide the preloader if it already played this session.
 const preloadScript = `try{if(sessionStorage.getItem('tp-preloaded')==='1')document.documentElement.classList.add('tp-preloaded')}catch(e){}`;
 
-export default function RootLayout({ children }: { children: ReactNode }) {
+export default async function RootLayout({ children }: { children: ReactNode }) {
+  const current = await getCurrentUser();
+  const navUser = current
+    ? { name: current.name, username: current.username, email: current.email, image: current.image, role: current.role }
+    : null;
   return (
     <html lang="en" className={poppins.variable} suppressHydrationWarning>
       <body className="min-h-dvh font-sans antialiased">
@@ -64,7 +69,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           Skip to content
         </a>
         <AppShell>
-          <Navbar />
+          <Navbar user={navUser} />
           <main id="main" tabIndex={-1} className="outline-none">
             {children}
           </main>

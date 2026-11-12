@@ -1,14 +1,15 @@
 /**
- * Product domain types.
+ * Product domain types — the shape pages and components work with.
  *
- * Shaped to map 1:1 onto future database tables (Phase 2):
- *   products          ← Product (minus nested arrays)
- *   product_images    ← ProductImage (product_id FK, position)
- *   product_variants  ← ProductVariant (product_id FK, size, color, price, sku, stock)
- *   designers / users ← Designer (Product.designer.id FK)
+ * Phase 2: lib/products.ts maps database rows (Design + DesignImage +
+ * ProductVariant + creator User) into these types, so UI code is the same
+ * for TruthPitch products and approved community designs.
  */
 
 export type ProductCategory = "tees" | "hoodies" | "hats" | "accessories";
+
+/** Matches the Prisma ProductType enum. */
+export type ProductTypeId = "TEE" | "HOODIE" | "HAT" | "TOTE" | "MUG" | "BOTTLE";
 
 export type ProductSize = "XS" | "S" | "M" | "L" | "XL" | "XXL" | "One Size";
 
@@ -30,11 +31,23 @@ export interface ProductImage {
 }
 
 export interface Designer {
-  /** "truthpitch" for in-house designs; a user id in Phase 2. */
+  /** User id of the creator */
   id: string;
   name: string;
-  /** Optional profile URL (Phase 2) */
+  username?: string | null;
+  avatar?: string | null;
+  /** Public profile URL (/creators/[username]) for community creators */
   href?: string;
+}
+
+/** Artwork placement for community designs, rendered on garment mockups. */
+export interface ProductMockup {
+  artworkUrl: string;
+  /** Offsets in % of the print area, -50…50 */
+  x: number;
+  y: number;
+  /** 0.3…1.6 */
+  scale: number;
 }
 
 /**
@@ -45,11 +58,13 @@ export interface Designer {
 export interface ProductVariant {
   id: string;
   productId: string;
+  productType: ProductTypeId;
   sku: string;
   size: ProductSize;
   color: ProductColor;
   /** Price in the store's minor-safe decimal (USD dollars, 2dp). */
   price: number;
+  compareAtPrice?: number;
   /** null = unlimited (print-on-demand) */
   stock: number | null;
   /** Print-on-demand provider variant id (e.g. Printful sync_variant_id). */
@@ -66,7 +81,16 @@ export interface Product {
   price: number;
   compareAtPrice?: number;
   currency: "USD";
+  /** Primary category (first product type) */
   category: ProductCategory;
+  /** Every category the design is available in */
+  categories: ProductCategory[];
+  productTypes: ProductTypeId[];
+  variants: ProductVariant[];
+  /** True for approved user-submitted designs */
+  isCommunity: boolean;
+  /** Present for community designs (artwork on a garment mockup) */
+  mockup?: ProductMockup;
   colors: ProductColor[];
   sizes: ProductSize[];
   description: string;
@@ -76,14 +100,16 @@ export interface Product {
   images: ProductImage[];
   isNew: boolean;
   isBestSeller: boolean;
-  /** Defaults to TruthPitch; Phase 2 user-submitted designs set this. */
+  /** TruthPitch (admin) or the community creator */
   designer: Designer;
   status: ProductStatus;
   tags: string[];
   createdAt: string; // ISO date
+  /** Units sold (for "popular" sorting) */
+  unitsSold: number;
 }
 
-export type ProductSort = "featured" | "newest" | "price-asc" | "price-desc";
+export type ProductSort = "featured" | "newest" | "popular" | "price-asc" | "price-desc";
 
 export interface ProductFilters {
   category?: ProductCategory | null;
@@ -93,6 +119,10 @@ export interface ProductFilters {
   maxPrice?: number | null;
   isNew?: boolean;
   isBestSeller?: boolean;
+  /** true = community only, false = TruthPitch only */
+  community?: boolean;
+  creatorUsername?: string;
+  productType?: ProductTypeId | null;
   search?: string;
   sort?: ProductSort;
   limit?: number;

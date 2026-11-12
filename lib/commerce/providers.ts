@@ -1,60 +1,50 @@
 /**
- * Commerce provider seams. Phase 1 ships mock implementations; swap them
- * for Stripe / Printful by implementing the same interfaces and changing
- * the exports at the bottom of this file. Nothing else needs to change.
+ * Payment provider seam. Phase 2 still uses a mock; to take real payments,
+ * implement `PaymentProvider` with Stripe and change the export below.
+ * (Print-on-demand fulfillment lives in lib/fulfillment.ts.)
  */
-import type { FulfillmentProviderId, Order, PaymentInfo, PaymentProviderId } from "@/types";
+import type { PaymentInfo, PaymentProviderId } from "@/types";
+
+export interface PaymentRequest {
+  orderId: string;
+  orderNumber: string;
+  amountCents: number;
+  currency: "USD";
+  email: string;
+}
 
 export interface PaymentProvider {
   id: PaymentProviderId;
-  /**
-   * Create a payment for the order. For Stripe this would create a
-   * PaymentIntent and return its client_secret for the Payment Element.
-   */
-  createPayment(order: Order): Promise<PaymentInfo & { clientSecret?: string }>;
-}
-
-export interface FulfillmentProvider {
-  id: FulfillmentProviderId;
-  /**
-   * Hand the paid order to print-on-demand. For Printful this maps each
-   * OrderItem.variantId → sync_variant_id and POSTs /orders.
-   */
-  createFulfillment(order: Order): Promise<{ externalId: string }>;
+  /** For Stripe: create a PaymentIntent and return its client_secret for the Payment Element. */
+  createPayment(req: PaymentRequest): Promise<PaymentInfo & { clientSecret?: string }>;
 }
 
 const mockPayments: PaymentProvider = {
   id: "mock",
-  async createPayment(order) {
-    return { provider: "mock", status: "succeeded", reference: `mock_pi_${order.id}` };
-  },
-};
-
-const mockFulfillment: FulfillmentProvider = {
-  id: "mock",
-  async createFulfillment(order) {
-    return { externalId: `mock_fo_${order.id}` };
+  async createPayment(req) {
+    return { provider: "mock", status: "succeeded", reference: `mock_pi_${req.orderNumber}` };
   },
 };
 
 /*
- * Example Stripe adapter (not installed — requires the `stripe` package):
+ * Example Stripe adapter (requires the `stripe` package + STRIPE_SECRET_KEY):
  *
  * import Stripe from "stripe";
  * const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!);
  * export const stripePayments: PaymentProvider = {
  *   id: "stripe",
- *   async createPayment(order) {
+ *   async createPayment(req) {
  *     const pi = await stripe.paymentIntents.create({
- *       amount: Math.round(order.totals.total * 100),
+ *       amount: req.amountCents,
  *       currency: "usd",
- *       metadata: { orderId: order.id },
- *       receipt_email: order.contact.email,
+ *       metadata: { orderId: req.orderId, orderNumber: req.orderNumber },
+ *       receipt_email: req.email,
  *     });
  *     return { provider: "stripe", status: "requires_payment", reference: pi.id, clientSecret: pi.client_secret ?? undefined };
  *   },
  * };
+ * Then confirm the order in a Stripe webhook (payment_intent.succeeded) and
+ * call fulfillment.createOrder there instead of in lib/orders.ts.
  */
 
 export const payments: PaymentProvider = mockPayments;
-export const fulfillment: FulfillmentProvider = mockFulfillment;

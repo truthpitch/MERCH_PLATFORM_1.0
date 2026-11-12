@@ -13,6 +13,7 @@ export const siteConfig = {
   ],
   nav: [
     { label: "Shop", href: "/shop" },
+    { label: "Marketplace", href: "/marketplace" },
     { label: "About", href: "/about" },
     { label: "Contact", href: "/contact" },
   ],
@@ -29,8 +30,8 @@ export const siteConfig = {
 
 /** Feature flags — read from public env so they work on server and client. */
 export const features = {
-  /** Phase 2: accounts. Shows the "Sign in" link when true. */
-  auth: process.env.NEXT_PUBLIC_ENABLE_AUTH === "true",
+  /** Accounts + studio. On by default in Phase 2; set NEXT_PUBLIC_ENABLE_AUTH=false to hide sign-in. */
+  auth: process.env.NEXT_PUBLIC_ENABLE_AUTH !== "false",
 } as const;
 
 export const FREE_SHIPPING_THRESHOLD = Number(process.env.NEXT_PUBLIC_FREE_SHIPPING_THRESHOLD ?? 75) || 75;

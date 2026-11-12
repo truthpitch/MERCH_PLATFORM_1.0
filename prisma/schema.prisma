@@ -1,0 +1,281 @@
+// TruthPitch — database schema (source of truth).
+//
+// This file targets SQLite for local development. The MySQL copy at
+// prisma/mysql/schema.prisma is GENERATED from this file by
+// `npm run db:sync-mysql` — never edit it by hand.
+//
+// Portability rules (so the same models work on SQLite and MySQL):
+//   * Money is stored as integer cents (no Decimal / float rounding).
+//   * Long text fields end with `// @text` — the sync script turns that into
+//     `@db.Text` for MySQL (VARCHAR(191) would truncate them).
+//   * No SQLite-only features, no raw SQL in the app.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum DesignStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ProductType {
+  TEE
+  HOODIE
+  HAT
+  TOTE
+  MUG
+  BOTTLE
+}
+
+enum OrderStatus {
+  PENDING_PAYMENT
+  PAID
+  IN_PRODUCTION
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+// ---------------------------------------------------------------------------
+// Users & auth
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  /// Public handle for /creators/[username]
+  username      String?   @unique
+  email         String    @unique
+  emailVerified DateTime?
+  /// scrypt hash; null for Google-only accounts
+  passwordHash  String?
+  role          Role      @default(USER)
+  /// Avatar URL (field is named `image` because Auth.js expects it)
+  image         String?
+  bio           String? // @text
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts    Account[]
+  designs     Design[]
+  orders      Order[]
+  resetTokens PasswordResetToken[]
+}
+
+/// OAuth accounts (Google) — shape required by @auth/prisma-adapter.
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? // @text
+  access_token      String? // @text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? // @text
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+  @@index([userId])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  /// sha256 of the token sent by email (the raw token is never stored)
+  tokenHash String    @unique
+  userId    String
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------------
+// Designs & catalog
+// ---------------------------------------------------------------------------
+
+model Design {
+  id              String       @id @default(cuid())
+  title           String
+  slug            String       @unique
+  tagline         String?
+  description     String // @text
+  /// The message / "truth" behind the design
+  story           String // @text
+  /// Newline-separated bullet points (fabric, fit, care)
+  details         String? // @text
+  /// Artwork (community designs) or primary product photo (TruthPitch)
+  imageUrl        String
+  /// Storage key for uploaded artwork (null for remote photos)
+  imageKey        String?
+  /// Mockup placement for community artwork (percent offsets + scale)
+  placementX      Float        @default(0)
+  placementY      Float        @default(0)
+  placementScale  Float        @default(1)
+  status          DesignStatus @default(DRAFT)
+  rejectionReason String? // @text
+  isNew           Boolean      @default(false)
+  isBestSeller    Boolean      @default(false)
+  creatorId       String
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  submittedAt     DateTime?
+  approvedAt      DateTime?
+
+  creator  User            @relation(fields: [creatorId], references: [id], onDelete: Restrict)
+  images   DesignImage[]
+  variants ProductVariant[]
+
+  @@index([status, createdAt])
+  @@index([creatorId])
+}
+
+/// Extra product photos (TruthPitch products). Community designs use mockups.
+model DesignImage {
+  id       String @id @default(cuid())
+  designId String
+  url      String // @text
+  alt      String
+  width    Int    @default(1200)
+  height   Int    @default(1500)
+  position Int    @default(0)
+
+  design Design @relation(fields: [designId], references: [id], onDelete: Cascade)
+
+  @@index([designId])
+}
+
+model ProductVariant {
+  id                   String      @id @default(cuid())
+  designId             String
+  productType          ProductType
+  size                 String
+  colorName            String
+  colorHex             String
+  /// Price in cents
+  priceCents           Int
+  compareAtCents       Int?
+  sku                  String      @unique
+  /// Print-on-demand catalog id (e.g. Printful sync_variant_id)
+  fulfillmentVariantId String?
+  active               Boolean     @default(true)
+  createdAt            DateTime    @default(now())
+
+  design     Design      @relation(fields: [designId], references: [id], onDelete: Cascade)
+  orderItems OrderItem[]
+
+  @@unique([designId, productType, size, colorName])
+  @@index([designId])
+}
+
+// ---------------------------------------------------------------------------
+// Orders
+// ---------------------------------------------------------------------------
+
+model Order {
+  id                String      @id @default(cuid())
+  /// Human-facing number, e.g. TP-482913
+  number            String      @unique
+  /// Random secret that lets a guest view their confirmation page
+  accessToken       String
+  userId            String?
+  email             String
+  phone             String?
+  marketingOptIn    Boolean     @default(false)
+  status            OrderStatus @default(PENDING_PAYMENT)
+  shippingMethod    String
+  subtotalCents     Int
+  shippingCents     Int
+  taxCents          Int
+  totalCents        Int
+  currency          String      @default("USD")
+
+  // Buyer's address (also the delivery address unless it's a gift)
+  shipFirstName  String
+  shipLastName   String
+  shipLine1      String
+  shipLine2      String?
+  shipCity       String
+  shipRegion     String
+  shipPostalCode String
+  shipCountry    String
+
+  isGift              Boolean @default(false)
+  paymentProvider     String  @default("mock")
+  paymentStatus       String  @default("requires_payment")
+  paymentReference    String?
+  fulfillmentProvider String  @default("mock")
+  fulfillmentId       String?
+  fulfillmentStatus   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user  User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+  items OrderItem[]
+  gift  GiftDetails?
+
+  @@index([userId])
+  @@index([email])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id             String      @id @default(cuid())
+  orderId        String
+  variantId      String
+  quantity       Int
+  unitPriceCents Int
+  // Snapshot at time of purchase (variants/designs can change later)
+  name           String
+  productType    ProductType
+  size           String
+  colorName      String
+  colorHex       String
+  imageUrl       String // @text
+  designerName   String
+
+  order   Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  variant ProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@index([variantId])
+}
+
+model GiftDetails {
+  id                  String  @id @default(cuid())
+  orderId             String  @unique
+  recipientFirstName  String
+  recipientLastName   String
+  recipientLine1      String
+  recipientLine2      String?
+  recipientCity       String
+  recipientRegion     String
+  recipientPostalCode String
+  recipientCountry    String
+  message             String // @text
+  hidePrices          Boolean @default(true)
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+}

@@ -4,9 +4,10 @@ import { AnimatePresence, motion, useMotionValueEvent, useScroll } from "framer-
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { AccountMenu, type NavUser } from "@/components/layout/AccountMenu";
 import { MobileMenu } from "@/components/layout/MobileMenu";
 import { Wordmark } from "@/components/layout/Wordmark";
-import { BagIcon, MenuIcon, UserIcon } from "@/components/ui/Icons";
+import { BagIcon, MenuIcon } from "@/components/ui/Icons";
 import { Magnetic } from "@/components/ui/Magnetic";
 import { EASE_OUT } from "@/lib/motion";
 import { features, siteConfig } from "@/lib/site";
@@ -14,7 +15,7 @@ import { cn } from "@/lib/utils";
 import { selectItemCount, useCart } from "@/store/cart";
 import { useUi } from "@/store/ui";
 
-export function Navbar() {
+export function Navbar({ user }: { user: NavUser | null }) {
   const pathname = usePathname();
   const { scrollY } = useScroll();
   const [hidden, setHidden] = useState(false);
@@ -55,13 +56,13 @@ export function Navbar() {
               <Wordmark />
             </Link>
 
-            <ul className="hidden items-center gap-1 md:flex">
+            <ul className="hidden items-center gap-0.5 md:flex">
               {siteConfig.nav.map((item) => (
                 <li key={item.href}>
                   <Link
                     href={item.href}
                     aria-current={isActive(item.href) ? "page" : undefined}
-                    className="group relative inline-flex h-10 items-center px-4 text-[0.9375rem] font-medium"
+                    className="group relative inline-flex h-10 items-center px-3 text-[0.9375rem] font-medium lg:px-4"
                   >
                     {item.label}
                     <span
@@ -77,14 +78,7 @@ export function Navbar() {
             </ul>
 
             <div className="flex items-center gap-1 sm:gap-2">
-              {features.auth && (
-                <Link
-                  href="/sign-in"
-                  className="hidden h-10 items-center gap-2 rounded-full px-3 text-sm font-medium hover:bg-navy/5 sm:inline-flex"
-                >
-                  <UserIcon size={18} /> Sign in
-                </Link>
-              )}
+              {features.auth && <AccountMenu user={user} />}
               <Magnetic strength={0.4}>
                 <button
                   type="button"
@@ -125,7 +119,7 @@ export function Navbar() {
           </nav>
         </div>
       </motion.header>
-      <MobileMenu />
+      <MobileMenu user={user} />
     </>
   );
 }

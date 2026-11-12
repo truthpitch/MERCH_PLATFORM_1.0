@@ -3,7 +3,9 @@
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
 import { useRef } from "react";
+import { accountLinks, Avatar, type NavUser } from "@/components/layout/AccountMenu";
 import { Wordmark } from "@/components/layout/Wordmark";
+import { signOutAction } from "@/lib/actions/auth";
 import { ArrowUpRightIcon, CloseIcon, socialIcons } from "@/components/ui/Icons";
 import { useFocusTrap, useScrollLock } from "@/lib/hooks";
 import { EASE_IN_OUT, EASE_OUT } from "@/lib/motion";
@@ -13,7 +15,7 @@ import { useUi } from "@/store/ui";
 const links = [{ label: "Home", href: "/" }, ...siteConfig.nav, { label: "Cart", href: "/cart" }];
 
 /** Full-screen mobile menu: curtain wipe + staggered oversized links. */
-export function MobileMenu() {
+export function MobileMenu({ user }: { user: NavUser | null }) {
   const open = useUi((s) => s.menuOpen);
   const setOpen = useUi((s) => s.setMenuOpen);
   const ref = useRef<HTMLDivElement>(null);
@@ -71,14 +73,48 @@ export function MobileMenu() {
                   </motion.div>
                 </li>
               ))}
-              {features.auth && (
-                <li>
-                  <Link href="/sign-in" onClick={close} className="mt-4 inline-block text-lg text-sand">
-                    Sign in
-                  </Link>
-                </li>
-              )}
             </ul>
+            {features.auth && (
+              <motion.div
+                className="mt-8 border-t border-white/10 pt-6"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1, transition: { delay: 0.55 } }}
+                exit={{ opacity: 0 }}
+              >
+                {user ? (
+                  <>
+                    <p className="flex items-center gap-3 text-sm text-white/70">
+                      <Avatar user={user} size={32} /> {user.name ?? user.email}
+                    </p>
+                    <ul className="mt-4 flex flex-wrap gap-x-5 gap-y-2">
+                      {accountLinks(user).map((l) => (
+                        <li key={l.href}>
+                          <Link href={l.href} onClick={close} className="text-lg font-semibold text-sand">
+                            {l.label}
+                          </Link>
+                        </li>
+                      ))}
+                      <li>
+                        <form action={signOutAction}>
+                          <button type="submit" className="text-lg font-semibold text-white/60">
+                            Sign out
+                          </button>
+                        </form>
+                      </li>
+                    </ul>
+                  </>
+                ) : (
+                  <div className="flex gap-5">
+                    <Link href="/sign-in" onClick={close} className="text-lg font-semibold text-sand">
+                      Sign in
+                    </Link>
+                    <Link href="/sign-up" onClick={close} className="text-lg font-semibold text-white/80">
+                      Create an account
+                    </Link>
+                  </div>
+                )}
+              </motion.div>
+            )}
           </nav>
 
           <motion.div

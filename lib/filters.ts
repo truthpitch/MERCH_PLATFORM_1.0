@@ -27,6 +27,7 @@ export const SIZE_ORDER: ProductSize[] = ["XS", "S", "M", "L", "XL", "XXL", "One
 export const SORT_OPTIONS: { value: ProductSort; label: string }[] = [
   { value: "featured", label: "Featured" },
   { value: "newest", label: "Newest" },
+  { value: "popular", label: "Most popular" },
   { value: "price-asc", label: "Price: low to high" },
   { value: "price-desc", label: "Price: high to low" },
 ];
@@ -42,7 +43,11 @@ export function isSort(v: unknown): v is ProductSort {
 export function applyFilters(list: Product[], f: ProductFilters = {}): Product[] {
   let out = list.filter((p) => p.status === "approved");
 
-  if (f.category) out = out.filter((p) => p.category === f.category);
+  if (f.category) out = out.filter((p) => p.categories.includes(f.category!));
+  if (f.productType) out = out.filter((p) => p.productTypes.includes(f.productType!));
+  if (f.community === true) out = out.filter((p) => p.isCommunity);
+  if (f.community === false) out = out.filter((p) => !p.isCommunity);
+  if (f.creatorUsername) out = out.filter((p) => p.designer.username === f.creatorUsername);
   if (f.sizes?.length) out = out.filter((p) => p.sizes.some((s) => f.sizes!.includes(s)));
   if (f.colors?.length) out = out.filter((p) => p.colors.some((c) => f.colors!.includes(c.name)));
   if (f.minPrice != null) out = out.filter((p) => p.price >= f.minPrice!);
@@ -51,7 +56,7 @@ export function applyFilters(list: Product[], f: ProductFilters = {}): Product[]
   if (f.isBestSeller) out = out.filter((p) => p.isBestSeller);
   if (f.search) {
     const q = f.search.toLowerCase();
-    out = out.filter((p) => [p.name, p.tagline, p.category, ...p.tags].some((s) => s.toLowerCase().includes(q)));
+    out = out.filter((p) => [p.name, p.tagline, p.designer.name, ...p.categories, ...p.tags].some((s) => s.toLowerCase().includes(q)));
   }
 
   out = sortProducts(out, f.sort ?? "featured");
@@ -64,6 +69,8 @@ export function sortProducts(list: Product[], sort: ProductSort): Product[] {
   switch (sort) {
     case "newest":
       return copy.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    case "popular":
+      return copy.sort((a, b) => b.unitsSold - a.unitsSold || b.createdAt.localeCompare(a.createdAt));
     case "price-asc":
       return copy.sort((a, b) => a.price - b.price);
     case "price-desc":
@@ -95,7 +102,7 @@ export function buildFilterOptions(list: Product[]): FilterOptions {
     categories: CATEGORIES.map((value) => ({
       value,
       label: CATEGORY_LABELS[value],
-      count: approved.filter((p) => p.category === value).length,
+      count: approved.filter((p) => p.categories.includes(value)).length,
     })),
     sizes: SIZE_ORDER.filter((s) => sizes.has(s)),
     colors: [...colors.values()],

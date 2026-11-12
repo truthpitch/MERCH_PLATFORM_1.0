@@ -8,6 +8,7 @@ const columns = [
     title: "Shop",
     links: [
       { label: "All products", href: "/shop" },
+      { label: "Marketplace", href: "/marketplace" },
       { label: "Tees", href: "/shop?category=tees" },
       { label: "Hoodies", href: "/shop?category=hoodies" },
       { label: "Hats", href: "/shop?category=hats" },
@@ -18,6 +19,7 @@ const columns = [
     title: "Brand",
     links: [
       { label: "About", href: "/about" },
+      { label: "Design studio", href: "/studio" },
       { label: "Contact", href: "/contact" },
       { label: "Shipping & returns", href: "/contact#faq" },
       { label: "Cart", href: "/cart" },
